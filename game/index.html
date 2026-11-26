@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:,">
+<title>Merpati — Archipelago Run</title>
+<style>
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden;
+    background: #0b1c2c; font-family: "Segoe UI", Verdana, sans-serif; }
+  #game { position: fixed; inset: 0; display: block; width: 100vw; height: 100vh; }
+  .panel { position: absolute; color: #e8f6ff; background: rgba(6, 24, 38, 0.62);
+    border: 1px solid rgba(140, 220, 255, 0.35); border-radius: 10px;
+    padding: 10px 14px; backdrop-filter: blur(2px); user-select: none; }
+  .lit { color: #7dffb0; text-shadow: 0 0 8px rgba(125, 255, 176, 0.9); }
+  .amber { color: #ffd166; text-shadow: 0 0 8px rgba(255, 209, 102, 0.9); }
+  #hud-left { top: 14px; left: 14px; min-width: 190px; }
+  #hud-left .row { display: flex; justify-content: space-between; gap: 18px;
+    font-size: 15px; line-height: 1.5; letter-spacing: 0.08em; }
+  #hud-left .row b { font-size: 21px; font-variant-numeric: tabular-nums; }
+  #hud-right { top: 14px; right: 14px; text-align: right; min-width: 170px; }
+  #hud-right .row { display: flex; justify-content: space-between; gap: 18px;
+    font-size: 15px; line-height: 1.5; letter-spacing: 0.08em; }
+  #hud-right .row b { font-size: 21px; font-variant-numeric: tabular-nums; }
+  #mission { top: 14px; left: 50%; transform: translateX(-50%); text-align: center;
+    font-size: 15px; letter-spacing: 0.12em; padding: 8px 18px; }
+  #mission b { color: #ffd166; }
+  #compass { bottom: 16px; left: 50%; transform: translateX(-50%);
+    width: 340px; text-align: center; padding: 6px 0 8px; }
+  #compass canvas { display: block; margin: 0 auto; }
+  #attitude { bottom: 16px; left: 16px; padding: 8px; }
+  #attitude canvas { display: block; border-radius: 50%; }
+  #throttle { bottom: 16px; right: 16px; width: 54px; height: 170px; padding: 10px 8px;
+    display: flex; flex-direction: column; align-items: center; gap: 6px; }
+  #throttle .track { position: relative; width: 14px; flex: 1;
+    background: rgba(255,255,255,0.12); border-radius: 7px; overflow: hidden; }
+  #throttle .fill { position: absolute; bottom: 0; left: 0; right: 0;
+    background: linear-gradient(#7dffb0, #ffd166, #ff7a5c); }
+  #throttle .label { font-size: 12px; letter-spacing: 0.14em; }
+  #toast { top: 84px; left: 50%; transform: translateX(-50%); font-size: 22px;
+    font-weight: 700; letter-spacing: 0.1em; color: #ffd166;
+    text-shadow: 0 0 12px rgba(255, 209, 102, 0.8); border: none; background: none;
+    opacity: 0; transition: opacity 0.25s; pointer-events: none; white-space: nowrap; }
+  #screen { position: absolute; inset: 0; display: flex; align-items: center;
+    justify-content: center; background: rgba(4, 18, 30, 0.45); z-index: 5; }
+  #screen .card { max-width: 620px; margin: 16px; padding: 28px 34px; text-align: center;
+    color: #e8f6ff; background: rgba(6, 26, 40, 0.88);
+    border: 1px solid rgba(140, 220, 255, 0.4); border-radius: 16px; }
+  #screen h1 { margin: 0 0 4px; font-size: 40px; letter-spacing: 0.06em; color: #ffd166;
+    text-shadow: 0 0 18px rgba(255, 209, 102, 0.7); }
+  #screen h2 { margin: 0 0 14px; font-size: 16px; font-weight: 400;
+    letter-spacing: 0.28em; color: #8cdcff; }
+  #screen p { font-size: 15px; line-height: 1.55; margin: 10px 0; }
+  #screen .missions { display: flex; gap: 10px; justify-content: center; margin: 18px 0 6px; }
+  #screen button { cursor: pointer; font: inherit; font-size: 15px; font-weight: 700;
+    color: #06202e; background: #ffd166; border: none; border-radius: 9px;
+    padding: 11px 16px; box-shadow: 0 0 14px rgba(255, 209, 102, 0.45); }
+  #screen button:hover { background: #ffe08a; }
+  #screen button.alt { background: #7dffb0; box-shadow: 0 0 14px rgba(125, 255, 176, 0.4); }
+  #screen .keys { font-size: 13px; color: #a8d4e8; line-height: 1.7; }
+  #screen .keys b { color: #e8f6ff; }
+  #screen.hidden, .hidden { display: none !important; }
+</style>
+</head>
+<body>
+<canvas id="game" width="1280" height="720"></canvas>
+
+<div id="hud-left" class="panel">
+  <div class="row"><span>ALT</span><b id="alt" class="lit">0 m</b></div>
+  <div class="row"><span>SPD</span><b id="spd" class="lit">0 kt</b></div>
+  <div class="row"><span>HDG</span><b id="hdg" class="lit">000&deg;</b></div>
+  <div class="row"><span>VERT</span><b id="vert" class="amber">+0 m/s</b></div>
+</div>
+
+<div id="hud-right" class="panel">
+  <div class="row"><span>SCORE</span><b id="score" class="lit">0</b></div>
+  <div class="row"><span>RINGS</span><b id="rings" class="amber">0 / 8</b></div>
+  <div class="row"><span>FUEL</span><b id="fuel" class="lit">100%</b></div>
+  <div class="row"><span>TIME</span><b id="time" class="lit">0:00</b></div>
+</div>
+
+<div id="mission" class="panel">MISSION <b id="mission-name">RING RUN</b> &nbsp;·&nbsp; <span id="mission-hint">Fly through all 8 rings</span></div>
+
+<div id="compass" class="panel"><canvas id="compass-canvas" width="320" height="34"></canvas></div>
+
+<div id="attitude" class="panel"><canvas id="attitude-canvas" width="110" height="110"></canvas></div>
+
+<div id="throttle" class="panel"><span class="label">THR</span>
+  <div class="track"><div id="throttle-fill" class="fill" style="height: 0%"></div></div>
+  <span id="throttle-pct" class="label lit">0%</span>
+</div>
+
+<div id="toast"></div>
+
+<div id="screen"><div class="card">
+  <h1>MERPATI</h1>
+  <h2>ARCHIPELAGO RUN</h2>
+  <p id="screen-text">A little prop plane, a chain of green islands, and a sky full of
+  rings. Take off from Pulau Merpati, thread every ring, and bring her home
+  onto the strip — gently, with fuel to spare.</p>
+  <div class="missions">
+    <button id="btn-ring" data-mission="rings">1 · RING RUN</button>
+    <button id="btn-land" class="alt" data-mission="landing">2 · ISLAND HOP</button>
+    <button id="btn-free" class="alt" data-mission="free">3 · FREE FLIGHT</button>
+  </div>
+  <p class="keys"><b>W / S</b> throttle &nbsp;·&nbsp; <b>&larr; &rarr;</b> roll &nbsp;·&nbsp;
+  <b>&uarr; &darr;</b> pitch &nbsp;·&nbsp; <b>A / D</b> rudder &nbsp;·&nbsp;
+  <b>Mouse</b> steer &nbsp;·&nbsp; <b>Space</b> brakes &nbsp;·&nbsp; <b>R</b> restart &nbsp;·&nbsp; <b>M</b> sound</p>
+  <p class="keys">Land on the runway under 12 m/s descent to score. Touch the sea or the hills and she is done.</p>
+</div></div>
+
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>
